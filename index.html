@@ -1,0 +1,1035 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hapus Baris Kosong</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&family=Press+Start+2P&display=swap">
+<style>
+  /* Layout: satu kolom sempit seperti lembar kerja; peta baris sebagai pusat visual. */
+  :root {
+    --bg: #eaf0ee;
+    --surface: #ffffff;
+    --fg: #13201b;
+    --muted: #54655f;
+    --line: #cdd9d5;
+    --accent: #0b6b4f;
+    --accent-fg: #ffffff;
+    --accent-soft: #d8ede4;
+    --removed: #f1d3cf;
+    --danger: #a8281f;
+    --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-num: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1613;
+      --surface: #16211d;
+      --fg: #e5eee9;
+      --muted: #94a69f;
+      --line: #2b3b36;
+      --accent: #58c4a0;
+      --accent-fg: #06201a;
+      --accent-soft: #1b3a30;
+      --removed: #5b2c28;
+      --danger: #f08a80;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0e1613;
+    --surface: #16211d;
+    --fg: #e5eee9;
+    --muted: #94a69f;
+    --line: #2b3b36;
+    --accent: #58c4a0;
+    --accent-fg: #06201a;
+    --accent-soft: #1b3a30;
+    --removed: #5b2c28;
+    --danger: #f08a80;
+    color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { min-height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.5;
+    margin: 0;
+    padding-block: 28px 40px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  main { max-width: 560px; margin: 0 auto; display: grid; gap: 16px; min-width: 0; }
+
+  h1 { font-size: 1.75rem; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  .sub { margin: 6px 0 0; color: var(--muted); font-size: 0.95rem; max-width: 46ch; }
+
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 16px;
+    display: grid;
+    gap: 14px;
+    min-width: 0;
+  }
+  .label-kecil {
+    font-size: 0.75rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  }
+
+  /* pilih file */
+  .pilih { position: relative; }
+  .pilih input[type="file"] {
+    position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 2;
+  }
+  .tombol-berkas {
+    display: grid; gap: 2px; justify-items: start;
+    border: 1.5px dashed var(--line); border-radius: 10px;
+    padding: 18px 16px; background: var(--bg);
+  }
+  .pilih input:focus-visible + .tombol-berkas { outline: 3px solid var(--accent); outline-offset: 2px; }
+  .pilih:hover .tombol-berkas { border-color: var(--accent); }
+  .tombol-berkas strong { font-weight: 600; overflow-wrap: anywhere; }
+  .tombol-berkas span { color: var(--muted); font-size: 0.9rem; }
+  .ada-berkas .tombol-berkas { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+
+  .catatan-file { font-size: 0.85rem; color: var(--muted); background: var(--bg); border-radius: 8px; padding: 10px 12px; }
+  .catatan-file strong { color: var(--fg); font-weight: 600; }
+  .catatan-file ol { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 2px; }
+  .catatan-file b { color: var(--fg); font-weight: 500; }
+  .opsi { display: grid; gap: 10px; }
+  .opsi label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; font-size: 0.95rem; }
+  .opsi input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--accent); flex: none; }
+
+  button {
+    font: inherit; font-weight: 600; min-height: 52px; border-radius: 8px; border: 0; cursor: pointer;
+    background: var(--accent); color: var(--accent-fg); padding: 0 18px; width: 100%;
+  }
+  button:disabled { background: var(--line); color: var(--muted); cursor: not-allowed; }
+  button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+  button.sekunder { background: transparent; color: var(--accent); border: 1.5px solid var(--accent); }
+
+  /* progres */
+  .tahap { font-weight: 500; overflow-wrap: anywhere; }
+  /* ---- progres gaya game: robot pembersih menyapu petak debu (baris kosong) ---- */
+  .game {
+    --p: 0;
+    position: relative; height: 104px; overflow: hidden;
+    border-radius: 10px; border: 2px solid var(--fg);
+    background:
+      linear-gradient(var(--accent-soft) 0 62%, transparent 62%),
+      var(--surface);
+  }
+  .game::before { /* awan piksel */
+    content: ""; position: absolute; top: 14px; left: 18%; width: 34px; height: 10px; background: var(--surface);
+    box-shadow: 10px -8px 0 var(--surface), 170px 10px 0 var(--surface), 180px 2px 0 var(--surface), 60px 4px 0 var(--surface);
+    opacity: 0.85;
+  }
+  .lintasan {
+    position: absolute; left: 24px; right: 24px; bottom: 12px; height: 26px;
+    display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 3px;
+  }
+  .petak {
+    position: relative; background: var(--removed); border: 2px solid var(--danger); border-radius: 3px;
+    transition: transform 160ms ease-out, background-color 160ms, border-color 160ms;
+  }
+  .petak.bersih { background: var(--accent-soft); border-color: var(--accent); transform: scale(0.6); }
+  .petak.pop { animation: muncul 320ms ease-out; }
+  .petak.pop::after {
+    content: "\2726"; position: absolute; left: -4px; right: -4px; top: -6px; text-align: center;
+    color: var(--accent); font-size: 16px; line-height: 1; animation: bintang 700ms ease-out forwards; pointer-events: none;
+  }
+  .robot {
+    position: absolute; bottom: 38px; width: 40px; height: 36px;
+    left: calc(24px + (100% - 48px) * var(--p) - 20px);
+    transition: left 120ms linear;
+  }
+  .tubuh { position: absolute; inset: 0; animation: gerak 420ms steps(2, jump-none) infinite; }
+  .badan { position: absolute; left: 0; right: 0; top: 6px; bottom: 8px; background: var(--accent); border: 2px solid var(--fg); border-radius: 6px; }
+  .layar { position: absolute; left: 12px; right: 3px; top: 4px; height: 10px; background: var(--fg); border-radius: 3px; }
+  .mata { position: absolute; top: 3px; width: 3px; height: 4px; background: var(--bg); animation: kedip 2.6s infinite; }
+  .mata.a { left: 3px; } .mata.b { right: 3px; }
+  .antena { position: absolute; left: 12px; top: 0; width: 2px; height: 7px; background: var(--fg); }
+  .antena::before { content: ""; position: absolute; left: -2px; top: -3px; width: 6px; height: 6px; border-radius: 50%; background: var(--danger); }
+  .sapu {
+    position: absolute; right: -9px; bottom: 1px; width: 9px; height: 11px;
+    background: repeating-linear-gradient(90deg, var(--fg) 0 2px, transparent 2px 3px);
+  }
+  .roda {
+    position: absolute; bottom: 0; width: 13px; height: 13px; border-radius: 50%;
+    background: var(--fg); border: 2px dashed var(--bg); animation: putar 480ms linear infinite;
+  }
+  .roda.a { left: 3px; } .roda.b { right: 5px; }
+  .game.tak-pasti .robot { transition: none; animation: patroli 1.8s ease-in-out infinite alternate; }
+  .game.menang .tubuh { animation: menang 560ms ease-in-out infinite; }
+  .game.menang .roda { animation: none; }
+  @keyframes gerak { from { transform: translateY(0); } to { transform: translateY(-2px); } }
+  @keyframes putar { to { transform: rotate(360deg); } }
+  @keyframes patroli { from { left: 4px; } to { left: calc(100% - 44px); } }
+  @keyframes muncul { 0% { transform: scale(1); } 40% { transform: scale(1.4); } 100% { transform: scale(0.6); } }
+  @keyframes bintang { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-28px); } }
+  @keyframes kedip { 0%, 90%, 100% { transform: scaleY(1); } 94% { transform: scaleY(0.1); } }
+  @keyframes menang { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-16px); } }
+  .persen {
+    font-family: "Press Start 2P", var(--font-num), monospace; font-weight: 400; font-size: 2rem; line-height: 1.1;
+    font-variant-numeric: tabular-nums; color: var(--accent); text-shadow: 3px 3px 0 var(--line);
+  }
+  .statistik { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .statistik div { display: grid; gap: 2px; min-width: 0; }
+  .statistik b { font-family: var(--font-num); font-weight: 500; font-size: 1.05rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+
+  .peta { display: grid; grid-template-columns: repeat(40, minmax(0, 1fr)); gap: 2px; height: 44px; }
+  .blok { position: relative; background: var(--line); border-radius: 2px; overflow: hidden; opacity: 0.55; }
+  .blok.sudah { background: var(--removed); opacity: 1; }
+  .blok .isi { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: var(--accent); transition: height 160ms ease-out; }
+  .legenda { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.82rem; color: var(--muted); }
+  .legenda i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+
+  /* hasil */
+  .ringkas { font-size: 1.5rem; font-weight: 600; line-height: 1.2; margin: 0; }
+  .ringkas small { display: block; font-size: 0.9rem; font-weight: 400; color: var(--muted); margin-top: 2px; }
+  .tabel-bungkus { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; white-space: normal; overflow-wrap: anywhere; }
+  th { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  td { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+  td:first-child { font-family: var(--font-body); }
+  .catatan { font-size: 0.85rem; color: var(--muted); margin: 0; }
+
+  .pesan { margin: 0; padding: 12px 14px; border-radius: 8px; border: 1px solid var(--danger); color: var(--danger); font-size: 0.95rem; background: var(--surface); }
+  .pesan.info { border-color: var(--line); color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .blok .isi, .robot, .petak { transition: none; }
+    .tubuh, .roda, .mata, .petak.pop, .petak.pop::after, .game.tak-pasti .robot, .game.menang .tubuh { animation: none; }
+    .game.tak-pasti .robot { left: 4px; }
+  }
+
+  /* ===== Penyegaran tampilan ===== */
+  :root {
+    --radius: 18px;
+    --shadow: 0 1px 2px rgba(16, 40, 30, 0.05), 0 14px 34px -18px rgba(16, 40, 30, 0.3);
+    --glow: color-mix(in srgb, var(--accent) 55%, transparent);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 36px -18px rgba(0, 0, 0, 0.75); }
+  }
+  :root[data-theme="dark"] { --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 36px -18px rgba(0, 0, 0, 0.75); }
+
+  body {
+    background:
+      radial-gradient(820px 420px at 88% -8%, var(--accent-soft), transparent 70%),
+      radial-gradient(640px 360px at -8% 34%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 70%),
+      var(--bg);
+    background-attachment: fixed;
+    padding-block: 44px 64px;
+  }
+  main { max-width: 600px; gap: 20px; }
+
+  .kepala { display: flex; gap: 16px; align-items: flex-start; }
+  .logo {
+    flex: none; width: 56px; height: 56px; border-radius: 16px; display: grid; place-items: center;
+    color: var(--accent-fg);
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 60%, #000));
+    box-shadow: 0 12px 24px -12px var(--glow);
+  }
+  h1 { font-size: 2rem; letter-spacing: -0.02em; }
+  .sub { max-width: 52ch; line-height: 1.55; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chips span {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 0.78rem; font-weight: 500;
+    padding: 4px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent);
+  }
+  .chips span::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .panel {
+    border-radius: var(--radius); padding: 20px; gap: 16px; box-shadow: var(--shadow);
+    border-color: color-mix(in srgb, var(--line) 70%, transparent);
+    animation: naik 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  main > .panel:nth-of-type(2) { animation-delay: 80ms; }
+  main > .panel:nth-of-type(3) { animation-delay: 140ms; }
+  @keyframes naik { from { opacity: 0; transform: translateY(12px); } }
+  .panel > .label-kecil {
+    justify-self: start; padding: 4px 11px; border-radius: 999px;
+    background: var(--accent-soft); color: var(--accent); letter-spacing: 0.06em;
+  }
+
+  /* area pilih file */
+  .tombol-berkas {
+    grid-template-columns: auto 1fr; column-gap: 14px; align-items: center;
+    padding: 20px 18px; border-radius: 14px; border-width: 2px;
+    transition: border-color 150ms, background-color 150ms, transform 150ms, box-shadow 150ms;
+  }
+  .tombol-berkas::before {
+    content: ""; grid-row: 1 / span 2; width: 40px; height: 40px; margin: 6px; background: var(--accent);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Cpath d='M3 9h18M3 15h18M9 3v18'/%3E%3C/svg%3E") center / contain no-repeat;
+            mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='3' y='3' width='18' height='18' rx='3'/%3E%3Cpath d='M3 9h18M3 15h18M9 3v18'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  .pilih:hover .tombol-berkas { transform: translateY(-1px); box-shadow: 0 10px 24px -16px var(--glow); background: var(--accent-soft); }
+
+  .catatan-file {
+    border-left: 3px solid var(--accent); border-radius: 0 12px 12px 0; padding: 12px 14px; line-height: 1.5;
+    background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface));
+  }
+
+  .opsi label {
+    padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg);
+    align-items: center; transition: border-color 150ms, background-color 150ms;
+  }
+  .opsi label:hover { border-color: var(--accent); }
+  .opsi input[type="checkbox"] {
+    -webkit-appearance: none; appearance: none; width: 22px; height: 22px; margin: 0; flex: none;
+    border: 2px solid var(--line); border-radius: 7px; background: var(--surface);
+    display: grid; place-content: center; transition: background-color 150ms, border-color 150ms;
+  }
+  .opsi input[type="checkbox"]:checked { background: var(--accent); border-color: var(--accent); }
+  .opsi input[type="checkbox"]::after {
+    content: ""; width: 6px; height: 11px; margin-top: -2px; border: solid var(--accent-fg); border-width: 0 2.5px 2.5px 0;
+    transform: rotate(45deg) scale(0); transition: transform 150ms;
+  }
+  .opsi input[type="checkbox"]:checked::after { transform: rotate(45deg) scale(1); }
+  .opsi input[type="checkbox"]:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+  button {
+    min-height: 54px; border-radius: 14px; letter-spacing: 0.01em;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, #000));
+    box-shadow: 0 12px 24px -14px var(--glow);
+    transition: transform 150ms, box-shadow 150ms, filter 150ms;
+  }
+  button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.07); }
+  button:active:not(:disabled) { transform: translateY(1px); }
+  button:disabled { background: var(--line); box-shadow: none; }
+
+  /* progres */
+  .game { border-radius: 16px; box-shadow: 0 5px 0 var(--line); }
+  .statistik { gap: 12px; }
+  .statistik div { background: var(--bg); border-radius: 14px; padding: 12px 14px; }
+  .statistik b { font-size: 1.3rem; }
+  .peta { height: 48px; gap: 3px; }
+  .blok { border-radius: 3px; }
+  .legenda { gap: 6px 18px; }
+
+  /* hasil */
+  #hasil { border-color: var(--accent); box-shadow: var(--shadow), 0 0 0 4px color-mix(in srgb, var(--accent) 12%, transparent); }
+  .ringkas { font-size: 1.75rem; color: var(--accent); }
+  .tabel-bungkus { border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: separate; border-spacing: 0; }
+  th { background: var(--bg); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--accent-soft); }
+  .catatan { line-height: 1.5; }
+
+  .pesan { border-radius: 12px; background: color-mix(in srgb, var(--danger) 8%, var(--surface)); line-height: 1.45; }
+  .pesan.info { background: var(--bg); }
+
+  @media (max-width: 420px) {
+    .logo { width: 48px; height: 48px; border-radius: 14px; }
+    h1 { font-size: 1.6rem; }
+    .panel { padding: 16px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .panel { animation: none; }
+    button, .tombol-berkas { transition: none; }
+  }
+
+  /* ===== Tema luar angkasa & roket ===== */
+  body {
+    background:
+      radial-gradient(900px 520px at 85% -5%, rgba(124, 77, 255, 0.38), transparent 70%),
+      radial-gradient(760px 520px at -5% 45%, rgba(0, 150, 199, 0.28), transparent 70%),
+      radial-gradient(600px 400px at 60% 105%, rgba(233, 84, 150, 0.2), transparent 70%),
+      linear-gradient(180deg, #060919 0%, #0b1230 55%, #141a45 100%);
+    background-attachment: fixed;
+  }
+  .angkasa { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+  .bintang i {
+    position: absolute; border-radius: 50%; background: #fff; opacity: 0.3;
+    animation: kelip 3s ease-in-out infinite alternate;
+  }
+  @keyframes kelip { from { opacity: 0.12; } to { opacity: 1; } }
+  .meteor {
+    position: absolute; width: 120px; height: 2px; border-radius: 2px; opacity: 0;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0), #fff);
+    transform: rotate(35deg); animation: meteor 9s ease-in infinite;
+  }
+  .meteor.m1 { left: 12%; top: 8%; }
+  .meteor.m2 { left: 58%; top: 22%; animation-delay: 4.5s; animation-duration: 11s; }
+  @keyframes meteor {
+    0% { opacity: 0; transform: translate(0, 0) rotate(35deg); }
+    4% { opacity: 1; }
+    12% { opacity: 0; transform: translate(260px, 182px) rotate(35deg); }
+    100% { opacity: 0; transform: translate(260px, 182px) rotate(35deg); }
+  }
+  .planet {
+    position: absolute; right: -70px; top: 14%; width: 200px; height: 200px; border-radius: 50%;
+    background: radial-gradient(circle at 30% 28%, #ffc58a, #e0663f 46%, #6d2a5c 100%);
+    box-shadow: inset -24px -20px 44px rgba(0, 0, 0, 0.5), 0 0 70px rgba(255, 140, 90, 0.25);
+  }
+  .planet::after {
+    content: ""; position: absolute; left: -46px; right: -46px; top: 50%; height: 50px; margin-top: -25px;
+    border: 5px solid rgba(255, 224, 180, 0.5); border-radius: 50%; transform: rotate(-18deg);
+  }
+  .bulan {
+    position: absolute; left: 5%; bottom: 10%; width: 74px; height: 74px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 62% 30%, rgba(0, 0, 0, 0.14) 0 7px, transparent 8px),
+      radial-gradient(circle at 34% 62%, rgba(0, 0, 0, 0.12) 0 10px, transparent 11px),
+      radial-gradient(circle at 70% 70%, rgba(0, 0, 0, 0.1) 0 5px, transparent 6px),
+      radial-gradient(circle at 32% 28%, #f1f3fb, #8f98b8 80%);
+    box-shadow: inset -10px -8px 18px rgba(0, 0, 0, 0.4), 0 0 40px rgba(180, 196, 255, 0.18);
+  }
+  .roket {
+    position: absolute; left: -60px; bottom: -130px; overflow: visible;
+    filter: drop-shadow(0 0 10px rgba(255, 160, 80, 0.55));
+    animation: terbang 18s linear 1s infinite;
+  }
+  .roket .api { transform-box: fill-box; transform-origin: 50% 0; animation: nyala 140ms ease-in-out infinite alternate; }
+  @keyframes terbang {
+    from { transform: translate(0, 0) rotate(45deg); }
+    to { transform: translate(135vh, -135vh) rotate(45deg); }
+  }
+  @keyframes nyala { from { transform: scaleY(0.8); } to { transform: scaleY(1.2); } }
+
+  /* teks kepala di atas latar gelap */
+  h1 { color: #ffffff; text-shadow: 0 2px 18px rgba(124, 77, 255, 0.45); }
+  .sub { color: #b9c3e8; }
+  .chips span { background: rgba(255, 255, 255, 0.1); color: #a7f0d4; backdrop-filter: blur(4px); }
+  .logo { box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15), 0 12px 28px -10px var(--glow); }
+
+  /* kartu seperti kaca di atas angkasa */
+  .panel {
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+    box-shadow: var(--shadow), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  }
+
+  @media (max-width: 520px) {
+    .planet { width: 130px; height: 130px; right: -50px; }
+    .bulan { width: 50px; height: 50px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .roket, .meteor, .bintang i { animation: none; }
+    .roket { left: auto; right: 7%; bottom: 9%; transform: rotate(45deg); }
+    .meteor { display: none; }
+  }
+</style>
+
+</head>
+<body>
+<div class="angkasa" aria-hidden="true">
+  <div class="bintang" id="bintang"></div>
+  <i class="meteor m1"></i><i class="meteor m2"></i>
+  <div class="planet"></div>
+  <div class="bulan"></div>
+  <svg class="roket" viewBox="0 0 48 100" width="44" height="92">
+    <g class="api">
+      <path d="M18 60c-2 12 2 24 6 36 4-12 8-24 6-36z" fill="#ff9a3c"/>
+      <path d="M21 60c-1 8 1 16 3 24 2-8 4-16 3-24z" fill="#fff2a8"/>
+    </g>
+    <path d="M14 42l-11 22 11-5zM34 42l11 22-11-5z" fill="#e8504f"/>
+    <path d="M24 2c9 10 12 28 10 56H14C12 30 15 12 24 2z" fill="#f4f6ff"/>
+    <path d="M24 2c3.5 3.5 6 8 7.5 14h-15c1.5-6 4-10.5 7.5-14z" fill="#e8504f"/>
+    <circle cx="24" cy="34" r="6" fill="#5ac8fa" stroke="#2b3a67" stroke-width="2"/>
+    <rect x="14" y="54" width="20" height="5" rx="2" fill="#c3c9e6"/>
+  </svg>
+</div>
+<main>
+  <header class="kepala">
+    <div class="logo" aria-hidden="true">
+      <svg viewBox="0 0 32 32" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3c4 3 6 8 5 15l-5 4-5-4c-1-7 1-12 5-15z"/><circle cx="16" cy="12" r="2"/><path d="M11 18l-4 4 1 4 4-2M21 18l4 4-1 4-4-2M16 24v4"/></svg>
+    </div>
+    <div>
+      <h1>Hapus Baris Kosong</h1>
+      <p class="sub">Pilih file Excel (.xlsx atau .xls), lalu baris yang seluruh selnya kosong dibuang. Pada .xlsx format sel tidak diubah sama sekali. File diproses di perangkat ini dan tidak diunggah.</p>
+      <div class="chips"><span>Mendukung .xlsx &amp; .xls</span><span>Diproses lokal</span><span>Tanpa unggah</span></div>
+    </div>
+  </header>
+
+  <section class="panel" aria-label="File dan pilihan">
+    <div class="label-kecil">1 · File</div>
+    <div class="pilih" id="pilih">
+      <input type="file" id="berkas" accept=".xlsx,.xlsm,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel" aria-label="Pilih file Excel">
+      <div class="tombol-berkas">
+        <strong id="namaBerkas">Pilih file Excel</strong>
+        <span id="infoBerkas">Format .xlsx atau .xls</span>
+      </div>
+    </div>
+    <div class="catatan-file">
+      <strong>File .xls lama bisa langsung dipilih.</strong> File .xls dibaca lalu dikonversi otomatis di perangkat ini, dan hasilnya disimpan sebagai .xlsx. Untuk .xls, isi, format angka/tanggal, lebar kolom, dan sel gabungan terbawa, tetapi warna, huruf tebal, dan border bisa hilang. Jika format harus utuh, simpan dulu sebagai .xlsx lewat Excel (<b>File</b> → <b>Save As</b> → <b>Excel Workbook (*.xlsx)</b>).
+    </div>
+    <div class="opsi">
+      <label for="semuaSheet"><input type="checkbox" id="semuaSheet" checked> <span>Proses semua sheet (jika tidak, hanya sheet pertama)</span></label>
+      <label for="anggapSpasi"><input type="checkbox" id="anggapSpasi" checked> <span>Anggap sel berisi spasi saja sebagai kosong</span></label>
+    </div>
+    <button id="jalan" type="button" disabled>Hapus baris kosong</button>
+    <p class="pesan" id="pesan" role="alert" hidden></p>
+  </section>
+
+  <section class="panel" aria-label="Progres">
+    <div class="label-kecil">2 · Progres</div>
+    <div class="tahap" id="tahap" aria-live="polite">Belum ada file diproses.</div>
+    <div class="game" id="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Progres penghapusan baris">
+      <div class="robot" aria-hidden="true">
+        <div class="tubuh">
+          <div class="antena"></div>
+          <div class="badan"><div class="layar"><i class="mata a"></i><i class="mata b"></i></div></div>
+          <i class="sapu"></i>
+          <i class="roda a"></i><i class="roda b"></i>
+        </div>
+      </div>
+      <div class="lintasan" id="lintasan" aria-hidden="true"></div>
+    </div>
+    <div class="persen" id="persen">0%</div>
+    <div class="statistik">
+      <div><span class="label-kecil">Baris diperiksa</span><b id="statPeriksa">0 / 0</b></div>
+      <div><span class="label-kecil">Baris kosong dihapus</span><b id="statHapus">0</b></div>
+    </div>
+    <div>
+      <div class="peta" id="peta" aria-hidden="true"></div>
+      <div class="legenda" style="margin-top: 8px">
+        <span><i style="background: var(--accent)"></i>baris berisi</span>
+        <span><i style="background: var(--removed)"></i>baris kosong dihapus</span>
+        <span><i style="background: var(--line)"></i>belum diperiksa</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="hasil" aria-label="Hasil" hidden>
+    <div class="label-kecil">3 · Hasil</div>
+    <p class="ringkas" id="ringkas"></p>
+    <div class="tabel-bungkus">
+      <table>
+        <thead><tr><th>Sheet</th><th>Awal</th><th>Dihapus</th><th>Sisa</th></tr></thead>
+        <tbody id="isiTabel"></tbody>
+      </table>
+    </div>
+    <button id="simpan" type="button">Simpan hasil (.xlsx)</button>
+    <p class="catatan">Hanya baris kosong yang dibuang. Isi dan format sel (huruf tebal, warna, border, format angka dan tanggal, lebar kolom, sel gabungan) dibiarkan apa adanya. Rumus tidak disesuaikan otomatis jika baris yang dirujuk bergeser.</p>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" onerror="var s=document.createElement('script');s.src='jszip.min.js';document.head.appendChild(s)"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" onerror="var s=document.createElement('script');s.src='xlsx.full.min.js';document.head.appendChild(s)"></script>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var nf = new Intl.NumberFormat("id-ID");
+  var NB = 40;
+  var MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  var NS_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+  var data = null;        // isi file yang dipilih (ArrayBuffer)
+  var namaDasar = "";     // nama file tanpa ekstensi
+  var ekstensi = ".xlsx";
+  var hasilBlob = null;   // file hasil
+  var unduh = null;       // kapabilitas downloads, null jika tidak tersedia
+  var sibuk = false;
+
+  // ---------- peta baris ----------
+  var peta = $("peta");
+  var blok = [];
+  for (var i = 0; i < NB; i++) {
+    var el = document.createElement("div");
+    el.className = "blok";
+    var isi = document.createElement("div");
+    isi.className = "isi";
+    el.appendChild(isi);
+    peta.appendChild(el);
+    blok.push({ el: el, isi: isi });
+  }
+  function resetPeta() {
+    blok.forEach(function (b) { b.el.className = "blok"; b.isi.style.height = "0%"; });
+  }
+  function gambarPeta(tot, kos, sampai) {
+    for (var i = 0; i <= sampai && i < NB; i++) {
+      if (!tot[i]) continue;
+      blok[i].el.className = "blok sudah";
+      blok[i].isi.style.height = ((tot[i] - kos[i]) / tot[i] * 100) + "%";
+    }
+  }
+
+  // ---------- tampilan ----------
+  function frame() {
+    return new Promise(function (resolve) {
+      var selesai = false;
+      var f = function () { if (!selesai) { selesai = true; resolve(); } };
+      requestAnimationFrame(f);
+      setTimeout(f, 60); // cadangan jika tab sedang di latar belakang
+    });
+  }
+  function tahap(teks, pasti) {
+    $("tahap").textContent = teks;
+    $("bar").classList.toggle("tak-pasti", !pasti);
+  }
+  // petak debu di lintasan game: dibersihkan satu per satu saat robot lewat
+  var NP = 24;
+  var petak = [];
+  var petakBersih = 0;
+  (function () {
+    var ln = $("lintasan");
+    for (var i = 0; i < NP; i++) {
+      var d = document.createElement("div");
+      d.className = "petak";
+      d.addEventListener("animationend", function (ev) { if (ev.target === this) this.classList.remove("pop"); });
+      ln.appendChild(d);
+      petak.push(d);
+    }
+  })();
+  function gambarGame(p) {
+    var n = Math.max(0, Math.min(NP, Math.floor(p / 100 * NP + 0.5)));
+    for (var i = 0; i < NP; i++) {
+      var t = petak[i];
+      if (i < n) {
+        if (!t.classList.contains("bersih")) {
+          t.classList.add("bersih");
+          if (i >= petakBersih) { t.classList.remove("pop"); void t.offsetWidth; t.classList.add("pop"); }
+        }
+      } else {
+        t.classList.remove("bersih", "pop");
+      }
+    }
+    petakBersih = n;
+  }
+  function setPersen(p) {
+    p = Math.max(0, Math.min(100, p));
+    $("bar").style.setProperty("--p", String(p / 100));
+    $("bar").setAttribute("aria-valuenow", String(Math.floor(p)));
+    $("bar").classList.toggle("menang", p >= 100);
+    $("persen").textContent = Math.floor(p) + "%";
+    gambarGame(p);
+  }
+  function tampilPesan(teks, info) {
+    var p = $("pesan");
+    p.textContent = teks;
+    p.className = "pesan" + (info ? " info" : "");
+    p.hidden = !teks;
+  }
+  function ukuran(b) {
+    return b >= 1048576 ? nf.format(Math.round(b / 104857.6) / 10) + " MB" : nf.format(Math.max(1, Math.round(b / 1024))) + " KB";
+  }
+
+  // ---------- bantuan XML ----------
+  function parseXml(teks) {
+    var doc = new DOMParser().parseFromString(teks, "application/xml");
+    if (doc.getElementsByTagName("parsererror").length) throw new Error("Isi XML di dalam file tidak valid.");
+    return doc;
+  }
+  function serial(doc) {
+    var s = new XMLSerializer().serializeToString(doc);
+    if (s.indexOf("<?xml") !== 0) s = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + s;
+    return s;
+  }
+  function semuaEl(doc, nama) {
+    return Array.prototype.slice.call(doc.getElementsByTagNameNS("*", nama));
+  }
+  // teks dari <si> atau <is>: gabungan <t> langsung dan <t> di dalam <r>, tanpa fonetik
+  function teksSI(si) {
+    var s = "";
+    for (var ch = si.firstElementChild; ch; ch = ch.nextElementSibling) {
+      var n = ch.localName;
+      if (n === "t") s += ch.textContent;
+      else if (n === "r") {
+        for (var t = ch.firstElementChild; t; t = t.nextElementSibling) if (t.localName === "t") s += t.textContent;
+      }
+    }
+    return s;
+  }
+  function bacaSharedStrings(teks) {
+    var doc = parseXml(teks);
+    var out = [];
+    for (var ch = doc.documentElement.firstElementChild; ch; ch = ch.nextElementSibling) {
+      if (ch.localName === "si") out.push(teksSI(ch));
+    }
+    return out;
+  }
+
+  // ---------- inti: buang baris kosong dari satu sheet (hanya menghapus elemen <row>) ----------
+  async function bersihkanSheet(xmlTeks, ss, anggapSpasi, lapor) {
+    var doc = parseXml(xmlTeks);
+    var root = doc.documentElement;
+    var sd = null;
+    for (var ch = root.firstElementChild; ch; ch = ch.nextElementSibling) {
+      if (ch.localName === "sheetData") { sd = ch; break; }
+    }
+    if (!sd) return { xml: null, total: 0, dihapus: 0, sisa: 0, peringatan: false };
+
+    var rows = [], rnList = [], prev = 0;
+    for (var e = sd.firstElementChild; e; e = e.nextElementSibling) {
+      if (e.localName !== "row") continue;
+      var rn = parseInt(e.getAttribute("r"), 10);
+      if (!(rn > prev)) rn = prev + 1;
+      rows.push(e); rnList.push(rn); prev = rn;
+    }
+    if (!rows.length) return { xml: null, total: 0, dihapus: 0, sisa: 0, peringatan: false };
+
+    var maxRow = prev;
+    var cnt = new Uint32Array(maxRow + 1); // cnt[r] = jumlah baris yang dipertahankan sampai baris r
+    var tot = new Array(NB).fill(0);
+    var kos = new Array(NB).fill(0);
+    var blokDari = function (n1) { return Math.min(NB - 1, Math.floor((n1 - 1) / maxRow * NB)); };
+
+    function selKosong(c) {
+      var v = null, is = null;
+      for (var x = c.firstElementChild; x; x = x.nextElementSibling) {
+        var n = x.localName;
+        if (n === "f") return false;           // sel berisi rumus tidak dianggap kosong
+        if (n === "v") v = x.textContent;
+        else if (n === "is") is = x;
+      }
+      var t = c.getAttribute("t");
+      var s;
+      if (t === "inlineStr") s = is ? teksSI(is) : "";
+      else if (t === "s") s = v == null || v === "" ? "" : (ss[parseInt(v, 10)] || "");
+      else if (t === "str") s = v == null ? "" : v;
+      else return v == null || v === "";       // angka, tanggal, boolean, error
+      if (anggapSpasi) s = s.trim();
+      return s === "";
+    }
+    function barisKosong(row) {
+      for (var c = row.firstElementChild; c; c = c.nextElementSibling) {
+        if (c.localName === "c" && !selKosong(c)) return false;
+      }
+      return true;
+    }
+
+    var langkah = Math.min(5000, Math.max(100, Math.ceil(rows.length / 50)));
+    var kept = 0;
+    prev = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i], r = rnList[i], g, b;
+      // baris yang tidak tertulis di XML = baris kosong
+      for (g = prev + 1; g < r; g++) { cnt[g] = kept; b = blokDari(g); tot[b]++; kos[b]++; }
+      b = blokDari(r);
+      tot[b]++;
+      if (barisKosong(row)) {
+        kos[b]++;
+        cnt[r] = kept;
+        sd.removeChild(row);
+      } else {
+        kept++;
+        cnt[r] = kept;
+        row.setAttribute("r", String(kept));
+        for (var c = row.firstElementChild; c; c = c.nextElementSibling) {
+          if (c.localName !== "c") continue;
+          var ref = c.getAttribute("r");
+          var m = ref && /^([A-Za-z]+)\d+$/.exec(ref);
+          if (m) c.setAttribute("r", m[1] + kept);
+        }
+      }
+      prev = r;
+      if ((i + 1) % langkah === 0 || i === rows.length - 1) {
+        gambarPeta(tot, kos, b);
+        lapor(r, maxRow, r - kept);
+        await frame();
+      }
+    }
+
+    // ---- sesuaikan alamat sel di bagian lain sheet (tanpa mengubah isi atau format) ----
+    function cntExt(r) { return r <= 0 ? 0 : (r > maxRow ? kept + (r - maxRow) : cnt[r]); }
+    function pc(s) {
+      var m = /^(\$?[A-Za-z]+\$?)(\d+)$/.exec(s);
+      return m ? { col: m[1], row: parseInt(m[2], 10) } : null;
+    }
+    function petaRef(s) {
+      var out = [];
+      s.split(/\s+/).forEach(function (p) {
+        if (!p) return;
+        var ab = p.split(":");
+        var a = pc(ab[0]), bb = ab.length > 1 ? pc(ab[1]) : a;
+        if (!a || !bb || ab.length > 2) { out.push(p); return; }
+        var ns = cntExt(a.row - 1) + 1, ne = cntExt(bb.row);
+        if (ne < ns) return; // seluruh rentang ada di baris yang dihapus
+        out.push(ab.length > 1 ? a.col + ns + ":" + bb.col + ne : a.col + ns);
+      });
+      return out.join(" ");
+    }
+    function ubah(nama, attr, saatHilang) {
+      semuaEl(doc, nama).forEach(function (el) {
+        var v = el.getAttribute(attr);
+        if (v == null) return;
+        var n = petaRef(v);
+        if (n) { el.setAttribute(attr, n); return; }
+        if (saatHilang === "hapusAttr") el.removeAttribute(attr);
+        else if (saatHilang === "A1") el.setAttribute(attr, "A1");
+        else if (el.parentNode) el.parentNode.removeChild(el);
+      });
+    }
+    ubah("mergeCell", "ref");
+    ubah("conditionalFormatting", "sqref");
+    ubah("dataValidation", "sqref");
+    ubah("hyperlink", "ref");
+    ubah("autoFilter", "ref");
+    ubah("ignoredError", "sqref");
+    ubah("dimension", "ref", "A1");
+    ubah("selection", "sqref", "A1");
+    ubah("selection", "activeCell", "A1");
+    ubah("pane", "topLeftCell", "hapusAttr");
+
+    ["mergeCells", "dataValidations", "hyperlinks"].forEach(function (nama) {
+      semuaEl(doc, nama).forEach(function (el) {
+        var n = 0;
+        for (var x = el.firstElementChild; x; x = x.nextElementSibling) n++;
+        if (n === 0) { el.parentNode.removeChild(el); return; }
+        if (el.hasAttribute("count")) el.setAttribute("count", String(n));
+      });
+    });
+
+    var peringatan = semuaEl(doc, "tableParts").length + semuaEl(doc, "drawing").length + semuaEl(doc, "legacyDrawing").length > 0;
+    return { xml: serial(doc), total: maxRow, dihapus: maxRow - kept, sisa: kept, peringatan: peringatan };
+  }
+
+  // ---------- alur utama ----------
+  async function jalankan() {
+    if (!data || sibuk) return;
+    if (typeof JSZip === "undefined") {
+      tampilPesan("Pustaka pembaca file gagal dimuat. Periksa koneksi internet lalu muat ulang halaman. Saat dibuka sebagai file di PC, Anda juga bisa menaruh jszip.min.js di folder yang sama.");
+      return;
+    }
+    sibuk = true;
+    tampilPesan("");
+    $("hasil").hidden = true;
+    hasilBlob = null;
+    $("jalan").disabled = true;
+    $("berkas").disabled = true;
+    setPersen(0);
+    resetPeta();
+    $("statPeriksa").textContent = "0 / 0";
+    $("statHapus").textContent = "0";
+
+    try {
+      tahap("Membuka file…", false);
+      await frame();
+      var bytes = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+      if (!(bytes[0] === 0x50 && bytes[1] === 0x4B)) {
+        throw new Error("File ini bukan format Excel yang dikenali. Coba simpan sebagai .xlsx lewat Excel.");
+      }
+      var zip = await JSZip.loadAsync(data);
+      var fWb = zip.file("xl/workbook.xml"), fRel = zip.file("xl/_rels/workbook.xml.rels");
+      if (!fWb || !fRel) throw new Error("Struktur file Excel tidak dikenali.");
+
+      var wbDoc = parseXml(await fWb.async("string"));
+      var relDoc = parseXml(await fRel.async("string"));
+      var targetById = {};
+      semuaEl(relDoc, "Relationship").forEach(function (x) {
+        targetById[x.getAttribute("Id")] = x.getAttribute("Target");
+      });
+      var sheets = semuaEl(wbDoc, "sheet").map(function (x) {
+        var rid = x.getAttributeNS(NS_REL, "id") || x.getAttribute("r:id");
+        var tg = targetById[rid] || "";
+        var path = tg.charAt(0) === "/" ? tg.slice(1) : "xl/" + tg;
+        return { nama: x.getAttribute("name"), path: path };
+      });
+
+      var ss = [];
+      var fSS = zip.file("xl/sharedStrings.xml");
+      if (fSS) ss = bacaSharedStrings(await fSS.async("string"));
+
+      var semua = $("semuaSheet").checked;
+      var anggap = $("anggapSpasi").checked;
+      var daftar = semua ? sheets : sheets.slice(0, 1);
+      var rincian = [];
+      var hapusTotal = 0;
+      var adaPeringatan = false;
+
+      for (var i = 0; i < daftar.length; i++) {
+        var sh = daftar[i];
+        tahap("Memeriksa baris: " + sh.nama + " (" + (i + 1) + "/" + daftar.length + ")", true);
+        resetPeta();
+        var fSheet = zip.file(sh.path);
+        if (!fSheet) { rincian.push({ nama: sh.nama, total: 0, dihapus: 0, sisa: 0 }); continue; }
+        var sebelum = hapusTotal;
+        var res = await bersihkanSheet(await fSheet.async("string"), ss, anggap, function (periksa, total, dihapus) {
+          setPersen((i + periksa / total) / daftar.length * 100);
+          $("statPeriksa").textContent = nf.format(periksa) + " / " + nf.format(total);
+          $("statHapus").textContent = nf.format(sebelum + dihapus);
+        });
+        if (res.xml) zip.file(sh.path, res.xml);
+        if (res.peringatan) adaPeringatan = true;
+        hapusTotal += res.dihapus;
+        rincian.push({ nama: sh.nama, total: res.total, dihapus: res.dihapus, sisa: res.sisa });
+      }
+
+      tahap("Menyimpan hasil…", false);
+      await frame();
+      // Daftar urutan hitung (calcChain) merujuk alamat lama; Excel akan membangunnya ulang sendiri.
+      if (zip.file("xl/calcChain.xml")) {
+        zip.remove("xl/calcChain.xml");
+        var fCT = zip.file("[Content_Types].xml");
+        if (fCT) zip.file("[Content_Types].xml", (await fCT.async("string")).replace(/<Override[^>]*calcChain[^>]*\/>/g, ""));
+        zip.file("xl/_rels/workbook.xml.rels", (await fRel.async("string")).replace(/<Relationship [^>]*calcChain[^>]*\/>/g, ""));
+      }
+      hasilBlob = await zip.generateAsync({ type: "blob", mimeType: MIME, compression: "DEFLATE", compressionOptions: { level: 6 } });
+
+      setPersen(100);
+      tahap("Selesai.", true);
+      $("statHapus").textContent = nf.format(hapusTotal);
+      tampilHasil(rincian, hapusTotal);
+      if (adaPeringatan) {
+        tampilPesan("Catatan: sheet ini memuat tabel Excel, gambar, atau komentar. Posisinya tidak ikut digeser, jadi periksa hasilnya.", true);
+      }
+    } catch (e) {
+      tahap("Gagal diproses.", true);
+      setPersen(0);
+      tampilPesan("File tidak bisa diproses: " + (e && e.message ? e.message : String(e)));
+    } finally {
+      sibuk = false;
+      $("jalan").disabled = !data;
+      $("berkas").disabled = false;
+    }
+  }
+
+  function tampilHasil(rincian, hapusTotal) {
+    $("ringkas").innerHTML = "";
+    $("ringkas").appendChild(document.createTextNode(nf.format(hapusTotal) + " baris kosong dihapus"));
+    var kecil = document.createElement("small");
+    kecil.textContent = hapusTotal === 0 ? "Tidak ada baris kosong di file ini." : "Dari " + rincian.length + " sheet yang diperiksa.";
+    $("ringkas").appendChild(kecil);
+
+    var tb = $("isiTabel");
+    tb.innerHTML = "";
+    rincian.forEach(function (x) {
+      var tr = document.createElement("tr");
+      [x.nama, nf.format(x.total), nf.format(x.dihapus), nf.format(x.sisa)].forEach(function (t) {
+        var td = document.createElement("td");
+        td.textContent = t;
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    $("hasil").hidden = false;
+    // Di luar Claude (file .html dibuka langsung di PC) unduhan memakai browser biasa.
+    var bisa = !!unduh || !window.claude;
+    $("simpan").disabled = !bisa;
+    if (!bisa) tampilPesan("Penyimpanan file tidak tersedia di tampilan ini. Buka halaman ini di aplikasi Claude atau browser lain.", true);
+  }
+
+  function unduhLangsung(nama) {
+    var url = URL.createObjectURL(hasilBlob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = nama;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    tampilPesan("Hasil diunduh sebagai " + nama + ". Periksa folder Downloads.", true);
+  }
+
+  async function simpan() {
+    if (!hasilBlob) return;
+    var nama = namaDasar + "_bersih" + ekstensi;
+    if (!unduh) {
+      if (!window.claude) unduhLangsung(nama);
+      return;
+    }
+    try {
+      await unduh.save({ filename: nama, data: hasilBlob });
+      tampilPesan("Hasil disimpan sebagai " + nama + ".", true);
+    } catch (e) {
+      var kode = e && e.code;
+      if (kode === "declined") tampilPesan("Penyimpanan dibatalkan. Tekan Simpan lagi jika ingin menyimpan.", true);
+      else tampilPesan("File belum tersimpan (" + (kode || "kesalahan tidak dikenal") + "). Coba tekan Simpan lagi.");
+    }
+  }
+
+  // ---------- pilih file ----------
+  $("berkas").addEventListener("change", async function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    tampilPesan("");
+    if (!f) return;
+    var mExt = /\.[^.]*$/.exec(f.name);
+    var ext = mExt ? mExt[0].toLowerCase() : "";
+    var asalXls = false;
+    try {
+      data = await f.arrayBuffer();
+    } catch (e) {
+      data = null;
+      tampilPesan("File tidak bisa dibaca. Pilih file lain.");
+      return;
+    }
+    // .xls (atau file berformat OLE2 / bukan zip): konversi dulu ke .xlsx di perangkat ini
+    var kepala = new Uint8Array(data, 0, Math.min(4, data.byteLength));
+    var bukanZip = !(kepala[0] === 0x50 && kepala[1] === 0x4B);
+    if (ext === ".xls" || (bukanZip && ext !== ".xlsx" && ext !== ".xlsm")) {
+      if (typeof XLSX === "undefined") {
+        data = null;
+        $("jalan").disabled = true;
+        tampilPesan("Pustaka pembaca .xls gagal dimuat. Periksa koneksi internet lalu muat ulang halaman. Saat dibuka sebagai file di PC, Anda juga bisa menaruh xlsx.full.min.js di folder yang sama.");
+        return;
+      }
+      try {
+        $("infoBerkas").textContent = "Mengonversi .xls…";
+        await frame();
+        var wb = XLSX.read(data, { type: "array", cellStyles: true, cellNF: true });
+        data = XLSX.write(wb, { type: "array", bookType: "xlsx", cellStyles: true });
+        asalXls = true;
+      } catch (e) {
+        data = null;
+        $("jalan").disabled = true;
+        $("pilih").classList.remove("ada-berkas");
+        $("namaBerkas").textContent = f.name;
+        $("infoBerkas").textContent = "Gagal membaca file";
+        tampilPesan("File .xls tidak bisa dibaca: " + (e && e.message ? e.message : String(e)) + ". Coba simpan sebagai .xlsx lewat Excel.");
+        return;
+      }
+    }
+    namaDasar = f.name.replace(/\.[^.]*$/, "") || "hasil";
+    ekstensi = ext === ".xlsm" ? ".xlsm" : ".xlsx";
+    $("namaBerkas").textContent = f.name;
+    $("infoBerkas").textContent = ukuran(f.size) + (asalXls ? " · .xls dikonversi ke .xlsx" : "") + " · ketuk untuk mengganti";
+    if (asalXls) tampilPesan("File .xls dikonversi otomatis. Hasil disimpan sebagai .xlsx; warna, huruf tebal, dan border bisa tidak terbawa.", true);
+    $("pilih").classList.add("ada-berkas");
+    $("jalan").disabled = false;
+    $("hasil").hidden = true;
+    hasilBlob = null;
+    tahap("Siap diproses.", true);
+    setPersen(0);
+    resetPeta();
+    $("statPeriksa").textContent = "0 / 0";
+    $("statHapus").textContent = "0";
+  });
+  $("jalan").addEventListener("click", jalankan);
+  $("simpan").addEventListener("click", simpan);
+
+  // ---------- kapabilitas unduh ----------
+  try {
+    if (window.claude && window.claude.use) {
+      window.claude.use("downloads").then(function (d) {
+        unduh = d || null;
+        if (!$("hasil").hidden) $("simpan").disabled = !unduh && !!window.claude;
+      }, function () { unduh = null; });
+    }
+  } catch (e) { unduh = null; }
+
+  setPersen(0);
+})();
+</script>
+<script>
+// bintang acak untuk latar luar angkasa
+(function () {
+  var w = document.getElementById("bintang");
+  if (!w) return;
+  var f = document.createDocumentFragment();
+  for (var i = 0; i < 120; i++) {
+    var s = document.createElement("i");
+    var u = Math.random();
+    var z = u > 0.93 ? 3 : u > 0.62 ? 2 : 1;
+    s.style.cssText = "left:" + (Math.random() * 100).toFixed(2) + "%;top:" + (Math.random() * 100).toFixed(2) +
+      "%;width:" + z + "px;height:" + z + "px;animation-delay:" + (Math.random() * 5).toFixed(2) +
+      "s;animation-duration:" + (2 + Math.random() * 4).toFixed(2) + "s";
+    f.appendChild(s);
+  }
+  w.appendChild(f);
+})();
+</script>
+</body>
+</html>
